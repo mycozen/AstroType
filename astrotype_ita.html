@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AstroType ITA</title>
+    <!-- Tailwind CSS for utility styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@300;500;700&display=swap');
+
+        :root {
+            --glass-bg: rgba(20, 15, 40, 0.4);
+            --glass-border: rgba(255, 255, 255, 0.15);
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0b0914;
+            font-family: 'Inter', sans-serif;
+            /* Animated gradient background */
+            background: linear-gradient(-45deg, #0b0914, #1c1138, #2a0a3a, #0b132b);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* Floating background orbs for depth */
+        .bg-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.6;
+            animation: float 20s infinite alternate ease-in-out;
+            pointer-events: none;
+            z-index: 0;
+        }
+        .orb-1 { width: 40vw; height: 40vw; background: #6b21a8; top: -10%; left: -10%; animation-delay: 0s; }
+        .orb-2 { width: 30vw; height: 30vw; background: #be185d; bottom: -10%; right: -10%; animation-delay: -5s; }
+        .orb-3 { width: 35vw; height: 35vw; background: #1d4ed8; top: 40%; left: 60%; animation-delay: -10s; }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(100px, 50px) scale(1.2); }
+        }
+
+        /* Glassmorphism utilities */
+        .glass {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        /* Canvas styling */
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10; /* Above background, below UI */
+        }
+
+        /* UI Layer */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 20;
+            pointer-events: none; /* Let clicks pass through to canvas if needed */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        /* Make interactive UI elements clickable */
+        .interactive {
+            pointer-events: auto;
+        }
+
+        /* Monospace font for the game elements and stats */
+        .font-mono-game {
+            font-family: 'Space Mono', monospace;
+        }
+    </style>
+</head>
+<body class="text-white selection:bg-pink-500 selection:text-white">
+
+    <!-- Ambient Background Elements -->
+    <div class="bg-orb orb-1"></div>
+    <div class="bg-orb orb-2"></div>
+    <div class="bg-orb orb-3"></div>
+
+    <!-- Main Game Canvas -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- UI Overlay Layer -->
+    <div id="ui-layer" class="p-4 sm:p-6">
+        
+        <!-- HUD (Heads Up Display) - ORA MINIMALISTA E IN ALTO -->
+        <div id="hud" class="absolute top-2 left-0 right-0 flex justify-center transition-opacity duration-500 opacity-0 pointer-events-none z-50">
+            <div class="glass px-4 py-1.5 rounded-full flex gap-4 sm:gap-6 text-[10px] sm:text-xs shadow-sm">
+                <div><span class="text-gray-400 uppercase">Punti</span> <span id="scoreDisplay" class="font-bold font-mono-game text-pink-400 ml-1">0</span></div>
+                <div><span class="text-gray-400 uppercase">WPM</span> <span id="wpmDisplay" class="font-bold font-mono-game text-green-400 ml-1">0</span></div>
+                <div><span class="text-gray-400 uppercase">Prec</span> <span id="accDisplay" class="font-bold font-mono-game text-yellow-400 ml-1">100%</span></div>
+                <div><span class="text-gray-400 uppercase">Ondata</span> <span id="waveDisplay" class="font-bold font-mono-game text-cyan-400 ml-1">1</span></div>
+            </div>
+        </div>
+
+        <!-- Screens Container -->
+        <div class="flex-grow flex items-center justify-center relative w-full h-full">
+            
+            <!-- Main Menu Screen -->
+            <div id="menuScreen" class="glass interactive rounded-2xl p-8 max-w-md w-full text-center transition-all transform scale-100 opacity-100">
+                <h1 class="text-5xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-pink-500">ASTROTYPE</h1>
+                <p class="text-gray-300 mb-8 tracking-widest text-sm uppercase">Edizione Italiana</p>
+                
+                <div class="text-left bg-black/20 rounded-lg p-4 mb-8 text-sm text-gray-200">
+                    <p class="mb-2">👉 <strong class="text-cyan-400">Regole:</strong> Digita le parole che cadono per distruggere i nemici prima che tocchino il fondo.</p>
+                    <p class="mb-2">👉 <strong class="text-pink-400">Typeracer:</strong> Se sbagli una lettera, diventerà rossa! Devi premere <kbd class="bg-gray-700 px-1 rounded">Backspace</kbd> per correggere l'errore.</p>
+                    <p>👉 <strong class="text-green-400">Stats:</strong> Massimizza le tue WPM (Parole al Minuto) e la Precisione!</p>
+                </div>
+
+                <button id="startBtn" class="w-full py-4 rounded-xl font-bold text-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 transition-all shadow-[0_0_20px_rgba(6,182,212,0.4)] hover:shadow-[0_0_30px_rgba(6,182,212,0.6)] transform hover:-translate-y-1">
+                    INIZIA PARTITA
+                </button>
+            </div>
+
+            <!-- Game Over Screen (Hidden by default) -->
+            <div id="gameOverScreen" class="glass interactive rounded-2xl p-8 max-w-md w-full text-center absolute transition-all transform scale-95 opacity-0 pointer-events-none hidden">
+                <h2 class="text-4xl font-bold mb-4 text-red-500">SCONFITTA</h2>
+                <p class="text-gray-300 mb-2">La tua base è stata distrutta.</p>
+                
+                <div class="my-6 grid grid-cols-3 gap-2 bg-black/30 p-4 rounded-xl">
+                    <div>
+                        <p class="text-[10px] sm:text-xs text-gray-400 uppercase tracking-wider mb-1">Punteggio</p>
+                        <p id="finalScoreDisplay" class="text-xl sm:text-2xl font-bold font-mono-game text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]">0</p>
+                    </div>
+                    <div>
+                        <p class="text-[10px] sm:text-xs text-gray-400 uppercase tracking-wider mb-1">WPM</p>
+                        <p id="finalWpmDisplay" class="text-xl sm:text-2xl font-bold font-mono-game text-green-400 drop-shadow-[0_0_8px_rgba(74,222,128,0.5)]">0</p>
+                    </div>
+                    <div>
+                        <p class="text-[10px] sm:text-xs text-gray-400 uppercase tracking-wider mb-1">Prec.</p>
+                        <p id="finalAccDisplay" class="text-xl sm:text-2xl font-bold font-mono-game text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.5)]">100%</p>
+                    </div>
+                </div>
+
+                <button id="restartBtn" class="w-full py-4 rounded-xl font-bold text-lg bg-gradient-to-r from-pink-500 to-red-600 hover:from-pink-400 hover:to-red-500 transition-all shadow-[0_0_20px_rgba(236,72,153,0.4)] hover:shadow-[0_0_30px_rgba(236,72,153,0.6)] transform hover:-translate-y-1 mt-4">
+                    GIOCA ANCORA
+                </button>
+            </div>
+
+        </div>
+
+        <!-- COPYRIGHT ISLAND - ORA MINUSCOLO IN BASSO A DESTRA -->
+        <div class="absolute bottom-2 right-2 pointer-events-none z-50">
+            <div class="glass px-2 py-1 rounded-md flex items-center justify-center shadow-sm">
+                <span class="text-[9px] font-medium text-gray-500 tracking-wide opacity-50">
+                    2026 Myco Zennaro - All rights reserved.
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Core Game Logic -->
+    <script>
+        /**
+         * ITALIAN DICTIONARY
+         * A diverse mix of short, medium, and long words.
+         */
+        const italianWords = [
+            "uno", "due", "tre", "ciao", "cane", "lupo", "gioco", "mondo", "spazio", "stella",
+            "tastiera", "computer", "astronave", "navicella", "galassia", "pianeta", "universo",
+            "energia", "velocità", "scudo", "vittoria", "sconfitta", "proiettile", "battaglia",
+            "meteorite", "satellite", "orbita", "luce", "sole", "luna", "mare", "fuoco",
+            "vento", "terra", "cielo", "nube", "tempesta", "ragione", "forza", "mente",
+            "spirito", "guerriero", "eroe", "destino", "sogno", "realtà", "illusione",
+            "tempo", "infinito", "materia", "vuoto", "silenzio", "suono", "eco", "ombra",
+            "blu", "ape", "oca", "sci", "oro", "uva", "via", "zio", "gatto", "nave",
+            "pace", "avventura", "coraggio", "difesa", "attacco", "laser", "plasma",
+            "motore", "propulsore", "scienza", "tecnologia", "futuro", "macchina",
+            "sistema", "rete", "dati", "codice", "programma", "digitale", "cibernetico",
+            "città", "virtù", "perché", "più", "società", "libertà", "verità", "lunedì"
+        ];
+
+        // --- Game Setup & Variables ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // UI Elements
+        const menuScreen = document.getElementById('menuScreen');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const hud = document.getElementById('hud');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const waveDisplay = document.getElementById('waveDisplay');
+        const wpmDisplay = document.getElementById('wpmDisplay');
+        const accDisplay = document.getElementById('accDisplay');
+        const finalScoreDisplay = document.getElementById('finalScoreDisplay');
+        const finalWpmDisplay = document.getElementById('finalWpmDisplay');
+        const finalAccDisplay = document.getElementById('finalAccDisplay');
+        const startBtn = document.getElementById('startBtn');
+        const restartBtn = document.getElementById('restartBtn');
+
+        // Game States
+        const STATE = { MENU: 0, PLAYING: 1, GAMEOVER: 2 };
+        let gameState = STATE.MENU;
+
+        // Core variables
+        let width, height;
+        let lastTime = 0;
+        let score = 0;
+        let wave = 1;
+        
+        // Stats variables for Typeracer logic
+        let gameStartTime = 0;
+        let activeTypingTimeMs = 0; // Tracks time only when actively typing a word
+        let totalKeystrokes = 0;
+        let correctKeystrokes = 0;
+        
+        // Entities arrays
+        let enemies = [];
+        let lasers = [];
+        let particles = [];
+        
+        // Targeting logic
+        let currentTarget = null; // The enemy currently being typed
+        
+        // Player properties
+        const player = {
+            x: 0,
+            y: 0,
+            size: 20,
+            color: '#06b6d4', // Cyan-400
+            glow: '#22d3ee'
+        };
+
+        // --- Resize Handling ---
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            width = canvas.width;
+            height = canvas.height;
+            // Center player at bottom
+            player.x = width / 2;
+            player.y = height - 50;
+        }
+        window.addEventListener('resize', resize);
+        resize(); // Initial sizing
+
+        // --- Classes ---
+
+        class Enemy {
+            constructor(word, x, y, speed) {
+                this.word = word.toLowerCase();
+                this.x = x;
+                this.y = y;
+                this.speed = speed;
+                this.typedIndex = 0;
+                this.errorString = ""; // Stores typos made on this word
+                this.dead = false;
+                this.size = 15 + (this.word.length * 2); // Size scales slightly with word length
+                this.color = '#ec4899'; // Pink-500
+                this.glow = '#f472b6';
+                
+                // Keep track of pending lasers so we know when to actually destroy it visually
+                this.pendingHits = 0; 
+                this.isLogicDead = false; // Dead in typing logic, awaiting final visual hit
+            }
+
+            update(dt) {
+                // Only move if not logic dead (gives a freeze effect when fully typed, waiting for lasers)
+                if (!this.isLogicDead) {
+                    this.y += this.speed * dt * 60; // normalized to 60fps
+                }
+
+                // Check game over condition
+                if (this.y + this.size > player.y && !this.isLogicDead) {
+                    triggerGameOver();
+                }
+            }
+
+            draw(ctx) {
+                if (this.dead) return;
+
+                // Draw geometric shape (Hexagon)
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                
+                // If targeted, pulse slightly
+                if (currentTarget === this && !this.isLogicDead) {
+                    ctx.scale(1.1, 1.1);
+                    ctx.shadowBlur = 20;
+                    ctx.shadowColor = this.glow;
+                } else if (this.isLogicDead) {
+                    // Frozen and waiting to die
+                    ctx.globalAlpha = 0.5;
+                }
+
+                ctx.beginPath();
+                for (let i = 0; i < 6; i++) {
+                    const angle = (Math.PI / 3) * i;
+                    const hx = this.size * Math.cos(angle);
+                    const hy = this.size * Math.sin(angle);
+                    if (i === 0) ctx.moveTo(hx, hy);
+                    else ctx.lineTo(hx, hy);
+                }
+                ctx.closePath();
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.fillStyle = 'rgba(236, 72, 153, 0.1)';
+                ctx.fill();
+
+                ctx.restore();
+
+                // Draw Text
+                ctx.font = 'bold 20px "Space Mono", monospace';
+                ctx.textAlign = 'center';
+                
+                const typedPart = this.word.substring(0, this.typedIndex);
+                const errorPart = this.errorString;
+                const untypedPart = this.word.substring(this.typedIndex);
+                
+                // Measure to perfectly align
+                const typedWidth = ctx.measureText(typedPart).width;
+                const errorWidth = ctx.measureText(errorPart).width;
+                const untypedWidth = ctx.measureText(untypedPart).width;
+                const totalWidth = typedWidth + errorWidth + untypedWidth;
+                
+                const startX = this.x - totalWidth / 2;
+
+                // Disable heavy shadow effects for text to ensure smooth performance (prevent stuttering)
+                ctx.shadowBlur = 0; 
+
+                // Draw typed part (faded / green)
+                ctx.fillStyle = '#4ade80'; // Green-400
+                ctx.textAlign = 'left';
+                ctx.fillText(typedPart, startX, this.y - this.size - 10);
+
+                // Draw error part (red) for Typeracer mechanic
+                if (errorPart.length > 0) {
+                    ctx.fillStyle = '#ef4444'; // Red-500
+                    ctx.fillText(errorPart, startX + typedWidth, this.y - this.size - 10);
+                }
+
+                // Draw untyped part (white)
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText(untypedPart, startX + typedWidth + errorWidth, this.y - this.size - 10);
+            }
+        }
+
+        class Laser {
+            constructor(startX, startY, targetEnemy, isLethal) {
+                this.x = startX;
+                this.y = startY;
+                this.target = targetEnemy;
+                this.speed = 15;
+                this.isLethal = isLethal; // If true, kills the enemy on impact
+                this.active = true;
+                this.color = '#22d3ee'; // Cyan
+                
+                // Register pending hit
+                if (this.target) {
+                    this.target.pendingHits++;
+                }
+            }
+
+            update(dt) {
+                if (!this.active || !this.target) {
+                    this.active = false;
+                    return;
+                }
+
+                // Calculate direction to target
+                const dx = this.target.x - this.x;
+                const dy = this.target.y - this.y;
+                const dist = Math.hypot(dx, dy);
+
+                if (dist < this.speed * dt * 60) {
+                    // Hit target
+                    this.active = false;
+                    if (this.target) {
+                        this.target.pendingHits--;
+                        spawnImpactParticles(this.target.x, this.target.y, this.color);
+                        
+                        if (this.isLethal) {
+                            this.target.dead = true;
+                            spawnExplosion(this.target.x, this.target.y);
+                            addScore(this.target.word.length * 10);
+                            checkWaveClear();
+                        }
+                    }
+                } else {
+                    // Move towards target
+                    const angle = Math.atan2(dy, dx);
+                    this.x += Math.cos(angle) * this.speed * dt * 60;
+                    this.y += Math.sin(angle) * this.speed * dt * 60;
+                }
+            }
+
+            draw(ctx) {
+                if (!this.active) return;
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y);
+                // Draw a trail
+                const dx = this.target.x - this.x;
+                const dy = this.target.y - this.y;
+                const angle = Math.atan2(dy, dx);
+                ctx.lineTo(this.x - Math.cos(angle) * 15, this.y - Math.sin(angle) * 15);
+                
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 3;
+                // RIMOSSO shadowBlur per massimizzare le prestazioni durante il typing veloce
+                ctx.lineCap = 'round';
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color, speedMultiplier = 1) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = (Math.random() * 3 + 1) * speedMultiplier;
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                this.life = 1.0;
+                this.decay = Math.random() * 0.02 + 0.02;
+                this.size = Math.random() * 3 + 1;
+            }
+
+            update(dt) {
+                this.x += this.vx * dt * 60;
+                this.y += this.vy * dt * 60;
+                this.life -= this.decay * dt * 60;
+            }
+
+            draw(ctx) {
+                if (this.life <= 0) return;
+                ctx.save();
+                ctx.globalAlpha = this.life;
+                ctx.fillStyle = this.color;
+                // RIMOSSO shadowBlur per evitare lag durante le esplosioni
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        // --- Core Functions ---
+
+        function spawnImpactParticles(x, y, color) {
+            // Ridotto il numero di particelle per colpo
+            for (let i = 0; i < 2; i++) {
+                particles.push(new Particle(x, y, color, 0.5));
+            }
+        }
+
+        function spawnExplosion(x, y) {
+            // Ridotto drasticamente per non intasare la GPU
+            for (let i = 0; i < 6; i++) {
+                // Mix of pink and white
+                const color = Math.random() > 0.5 ? '#ec4899' : '#ffffff';
+                particles.push(new Particle(x, y, color, 1.5));
+            }
+        }
+
+        function drawPlayer(ctx) {
+            ctx.save();
+            ctx.translate(player.x, player.y);
+            
+            // Subtle hover animation
+            const hover = Math.sin(Date.now() / 200) * 3;
+            ctx.translate(0, hover);
+
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = player.glow;
+
+            // Draw a futuristic ship shape (triangle with indent)
+            ctx.beginPath();
+            ctx.moveTo(0, -player.size);
+            ctx.lineTo(player.size, player.size);
+            ctx.lineTo(0, player.size - 5);
+            ctx.lineTo(-player.size, player.size);
+            ctx.closePath();
+
+            ctx.fillStyle = player.color;
+            ctx.fill();
+
+            // Inner core glow
+            ctx.beginPath();
+            ctx.moveTo(0, -player.size + 8);
+            ctx.lineTo(player.size - 6, player.size - 2);
+            ctx.lineTo(0, player.size - 5);
+            ctx.lineTo(-player.size + 6, player.size - 2);
+            ctx.closePath();
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function getRandomWord() {
+            return italianWords[Math.floor(Math.random() * italianWords.length)];
+        }
+
+        function startWave() {
+            waveDisplay.innerText = wave;
+            currentTarget = null;
+            
+            // Difficulty scaling - Faster and more frantic for Typeracer feel
+            let enemyCount = 3 + Math.floor(wave * 1.5);
+            const baseSpeed = 1.0 + (wave * 0.15);
+
+            // Active starting letters to prevent targeting bugs
+            const usedStartingLetters = new Set(enemies.map(e => e.word[0]));
+
+            // Lane system to prevent overlap
+            const minLaneWidth = 120; // Minimum width per word
+            const numLanes = Math.max(1, Math.floor((width - 60) / minLaneWidth));
+            let availableLanes = [];
+            for (let i = 0; i < numLanes; i++) {
+                availableLanes.push(i);
+            }
+            
+            // Shuffle lanes
+            availableLanes.sort(() => Math.random() - 0.5);
+
+            // Cap enemies by available lanes and unique letters
+            enemyCount = Math.min(enemyCount, availableLanes.length, 21);
+
+            for (let i = 0; i < enemyCount; i++) {
+                // Find a valid word with a unique starting letter
+                const availableWords = italianWords.filter(w => !usedStartingLetters.has(w[0]));
+                if (availableWords.length === 0) break; // Out of unique starting letters
+
+                const word = availableWords[Math.floor(Math.random() * availableWords.length)];
+                usedStartingLetters.add(word[0]);
+
+                // Assign to a lane
+                const laneIndex = availableLanes[i];
+                const laneWidth = (width - 60) / numLanes;
+                const x = 30 + (laneIndex * laneWidth) + (laneWidth / 2); // Center in lane
+
+                // Stagger Y positions far above screen, ensuring vertical spacing
+                const y = -100 - (i * 120) - (Math.random() * 50);
+                
+                // Slight speed variation
+                const speed = baseSpeed + (Math.random() * 0.2 - 0.1);
+
+                enemies.push(new Enemy(word, x, y, speed));
+            }
+        }
+
+        function checkWaveClear() {
+            // Check if all enemies are logically dead or fully destroyed
+            if (enemies.every(e => e.isLogicDead || e.dead)) {
+                wave++;
+                setTimeout(startWave, 1000); // Brief pause before next wave
+            }
+        }
+
+        function addScore(points) {
+            score += points;
+            scoreDisplay.innerText = score;
+            // Visual pop on score
+            scoreDisplay.style.transform = 'scale(1.3)';
+            setTimeout(() => {
+                scoreDisplay.style.transform = 'scale(1)';
+            }, 150);
+        }
+
+        function triggerGameOver() {
+            gameState = STATE.GAMEOVER;
+            finalScoreDisplay.innerText = score;
+            finalWpmDisplay.innerText = wpmDisplay.innerText;
+            finalAccDisplay.innerText = accDisplay.innerText;
+            
+            // UI Transitions
+            hud.classList.remove('opacity-100');
+            hud.classList.add('opacity-0');
+            
+            gameOverScreen.classList.remove('hidden');
+            // Small timeout to allow display:block to apply before animating opacity/transform
+            setTimeout(() => {
+                gameOverScreen.classList.remove('scale-95', 'opacity-0', 'pointer-events-none');
+                gameOverScreen.classList.add('scale-100', 'opacity-100');
+            }, 10);
+            
+            // Massive explosion at player
+            for (let i = 0; i < 100; i++) {
+                particles.push(new Particle(player.x, player.y, Math.random() > 0.5 ? '#06b6d4' : '#ec4899', 3));
+            }
+        }
+
+        function resetGame() {
+            score = 0;
+            wave = 1;
+            totalKeystrokes = 0;
+            correctKeystrokes = 0;
+            gameStartTime = Date.now();
+            activeTypingTimeMs = 0;
+            enemies = [];
+            lasers = [];
+            particles = [];
+            currentTarget = null;
+            scoreDisplay.innerText = score;
+            wpmDisplay.innerText = '0';
+            accDisplay.innerText = '100%';
+            
+            startWave();
+            gameState = STATE.PLAYING;
+            lastTime = performance.now();
+        }
+
+        // --- Input Handling ---
+
+        window.addEventListener('keydown', (e) => {
+            // Prevent default actions for standard space/arrows if needed
+            if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                e.preventDefault();
+            }
+
+            if (gameState !== STATE.PLAYING) return;
+
+            // Handle Backspace for Typeracer mechanic
+            if (e.key === 'Backspace') {
+                if (currentTarget && currentTarget.errorString.length > 0) {
+                    currentTarget.errorString = currentTarget.errorString.slice(0, -1);
+                    // Visual feedback laser for correction (Yellow/Amber)
+                    let l = new Laser(player.x, player.y - player.size, currentTarget, false);
+                    l.color = '#fbbf24'; 
+                    lasers.push(l);
+                }
+                return;
+            }
+
+            const key = e.key.toLowerCase();
+            // Validate it's a single lowercase letter or valid Italian accented letter
+            if (!/^[a-zàèéìòù]$/.test(key)) return;
+
+            totalKeystrokes++; // Any valid letter press counts towards stats
+
+            if (!currentTarget) {
+                // Find potential targets starting with the typed letter AND visible on screen (e.y > 20)
+                let potentials = enemies.filter(e => !e.isLogicDead && e.word[0] === key && e.y > 20);
+                
+                if (potentials.length > 0) {
+                    // Prioritize the one closest to the bottom (highest Y)
+                    potentials.sort((a, b) => b.y - a.y);
+                    currentTarget = potentials[0];
+                    correctKeystrokes++;
+                    processTypingHit(currentTarget);
+                } else {
+                    // No match - Error feedback
+                    canvas.style.transform = `translate(${(Math.random()-0.5)*10}px, ${(Math.random()-0.5)*10}px)`;
+                    setTimeout(() => { canvas.style.transform = 'translate(0,0)'; }, 50);
+                }
+            } else {
+                // We have a target, check Typeracer condition
+                // Only allow progression if there are no errors pending
+                if (currentTarget.errorString.length === 0 && currentTarget.word[currentTarget.typedIndex] === key) {
+                    correctKeystrokes++;
+                    processTypingHit(currentTarget);
+                } else {
+                    // Typo on current target
+                    if (currentTarget.errorString.length < 8) { // Cap error length visually
+                        currentTarget.errorString += key;
+                    }
+                    canvas.style.transform = `translate(${(Math.random()-0.5)*10}px, ${(Math.random()-0.5)*10}px)`;
+                    setTimeout(() => { canvas.style.transform = 'translate(0,0)'; }, 50);
+                }
+            }
+        });
+
+        function processTypingHit(enemy) {
+            enemy.typedIndex++;
+            const isLethal = (enemy.typedIndex === enemy.word.length);
+            
+            // Spawn a laser that will travel to the enemy
+            lasers.push(new Laser(player.x, player.y - player.size, enemy, isLethal));
+
+            if (isLethal) {
+                enemy.isLogicDead = true; // Mark dead in logic so we can target others
+                currentTarget = null;     // Free up targeting instantly
+            }
+        }
+
+        // --- UI Buttons ---
+
+        startBtn.addEventListener('click', () => {
+            // Hide Menu
+            menuScreen.classList.remove('scale-100', 'opacity-100');
+            menuScreen.classList.add('scale-95', 'opacity-0', 'pointer-events-none');
+            
+            // Show HUD
+            hud.classList.remove('opacity-0');
+            hud.classList.add('opacity-100');
+            
+            setTimeout(resetGame, 300); // Start after fade out
+        });
+
+        restartBtn.addEventListener('click', () => {
+            // Hide Game Over
+            gameOverScreen.classList.remove('scale-100', 'opacity-100');
+            gameOverScreen.classList.add('scale-95', 'opacity-0', 'pointer-events-none');
+            setTimeout(() => {
+                gameOverScreen.classList.add('hidden');
+                
+                // Show HUD
+                hud.classList.remove('opacity-0');
+                hud.classList.add('opacity-100');
+                
+                resetGame();
+            }, 300);
+        });
+
+        // --- Main Game Loop ---
+
+        function update(dt) {
+            if (gameState === STATE.PLAYING) {
+                enemies.forEach(e => e.update(dt));
+                
+                // Track active typing time (only when a target is locked)
+                if (currentTarget && !currentTarget.isLogicDead) {
+                    activeTypingTimeMs += dt * 1000;
+                }
+                
+                // Update Typeracer Stats
+                const elapsedMin = activeTypingTimeMs / 60000;
+                if (elapsedMin > 0) {
+                    // Standard WPM formula: (Characters / 5) / Minutes
+                    const wpm = Math.floor((correctKeystrokes / 5) / elapsedMin);
+                    wpmDisplay.innerText = wpm > 0 ? wpm : 0;
+                } else {
+                    wpmDisplay.innerText = 0;
+                }
+                const accuracy = totalKeystrokes > 0 ? Math.floor((correctKeystrokes / totalKeystrokes) * 100) : 100;
+                accDisplay.innerText = accuracy + '%';
+            }
+            lasers.forEach(l => l.update(dt));
+            particles.forEach(p => p.update(dt));
+
+            // Cleanup dead entities
+            enemies = enemies.filter(e => !e.dead);
+            lasers = lasers.filter(l => l.active);
+            particles = particles.filter(p => p.life > 0);
+        }
+
+        function draw() {
+            // Clear canvas
+            ctx.clearRect(0, 0, width, height);
+
+            if (gameState === STATE.PLAYING || gameState === STATE.GAMEOVER) {
+                // Draw targeting line if we have a current target
+                if (currentTarget && !currentTarget.isLogicDead && gameState === STATE.PLAYING) {
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.moveTo(player.x, player.y);
+                    ctx.lineTo(currentTarget.x, currentTarget.y);
+                    ctx.strokeStyle = 'rgba(34, 211, 238, 0.15)'; // faint cyan
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([5, 5]);
+                    ctx.stroke();
+                    ctx.restore();
+                }
+
+                // Draw Entities
+                enemies.forEach(e => e.draw(ctx));
+                lasers.forEach(l => l.draw(ctx));
+                particles.forEach(p => p.draw(ctx));
+                
+                // Draw player last so it's on top of particles
+                if (gameState === STATE.PLAYING) {
+                    drawPlayer(ctx);
+                }
+            }
+        }
+
+        function loop(timestamp) {
+            // Calculate delta time in seconds
+            let dt = (timestamp - lastTime) / 1000;
+            if (dt > 0.1) dt = 0.1; // Cap dt to prevent massive jumps if tab is inactive
+            lastTime = timestamp;
+
+            update(dt);
+            draw();
+
+            requestAnimationFrame(loop);
+        }
+
+        // Initialize Loop
+        requestAnimationFrame((timestamp) => {
+            lastTime = timestamp;
+            loop(timestamp);
+        });
+
+    </script>
+</body>
+</html>
